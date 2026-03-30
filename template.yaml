@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Description: AI DevOps Agent — CI failure analyzer with WhatsApp alerts
+
+Globals:
+  Function:
+    Timeout: 60          # 60s — enough time to fetch logs + call Groq + send WhatsApp
+    MemorySize: 256      # MB — lightweight Node app, 256 is plenty
+    Runtime: nodejs18.x
+    Environment:
+      Variables:
+        # These are pulled from AWS SSM Parameter Store at deploy time
+        # Never hardcode secrets here — see deployment steps in README
+        GITHUB_TOKEN: !Sub "{{resolve:ssm:/ai-devops-agent/GITHUB_TOKEN}}"
+        GROQ_API_KEY: !Sub "{{resolve:ssm:/ai-devops-agent/GROQ_API_KEY}}"
+        TWILIO_ACCOUNT_SID: !Sub "{{resolve:ssm:/ai-devops-agent/TWILIO_ACCOUNT_SID}}"
+        TWILIO_AUTH_TOKEN: !Sub "{{resolve:ssm:/ai-devops-agent/TWILIO_AUTH_TOKEN}}"
+        TWILIO_WHATSAPP_FROM: !Sub "{{resolve:ssm:/ai-devops-agent/TWILIO_WHATSAPP_FROM}}"
+        TWILIO_WHATSAPP_TO: !Sub "{{resolve:ssm:/ai-devops-agent/TWILIO_WHATSAPP_TO}}"
+        AGENT_SECRET: !Sub "{{resolve:ssm:/ai-devops-agent/AGENT_SECRET}}"
+
+Resources:
+  AiDevOpsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ai-devops-agent
+      Handler: src/lambda.handler      # file: src/lambda.js → export: handler
+      CodeUri: .                       # deploy everything from project root
+      Description: Analyzes GitHub CI failures and sends WhatsApp alerts
+      Events:
+        # API Gateway will auto-create a public HTTPS URL
+        CiFailureWebhook:
+          Type: Api
+          Properties:
+            Path: /ci-failure
+            Method: POST
+        HealthCheck:
+          Type: Api
+          Properties:
+            Path: /health
+            Method: GET
+
+Outputs:
+  # After deploy, SAM prints this URL — copy it to your GitHub Secret
+  WebhookUrl:
+    Description: "Your public webhook URL — set this as AI_AGENT_URL in GitHub Secrets"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod"
