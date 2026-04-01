@@ -57,5 +57,3 @@ app.post("/ci-failure", validateSecret, async (req, res) => {
 });
 
 module.exports = app;
-
-// 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
