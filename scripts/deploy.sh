@@ -6,15 +6,20 @@
 set -e  # exit on any error
 
 STACK_NAME="ai-devops-agent"
-REGION="us-east-1"        # ← match the region you used in setup-ssm.sh
-S3_BUCKET="ai-devops-agent-deploy-$(whoami)"   # unique S3 bucket for deployment artifacts
+REGION="ap-south-1"        # ← match the region you used in setup-ssm.sh
+S3_BUCKET="ai-devops-agent-deploy-$(whoami)-$(date +%s)"   # unique S3 bucket for deployment artifacts
 
 echo "📦 Installing dependencies..."
 npm install --production
 
 echo ""
 echo "🪣 Creating S3 bucket for deployment (if not exists)..."
-aws s3 mb s3://$S3_BUCKET --region $REGION 2>/dev/null || echo "   Bucket already exists, continuing..."
+echo "Creating bucket: $S3_BUCKET"
+
+aws s3 mb s3://$S3_BUCKET --region $REGION || {
+  echo "❌ Failed to create bucket. Exiting..."
+  exit 1
+}
 
 echo ""
 echo "🔨 Building SAM application..."

@@ -3,21 +3,20 @@
 
 const twilio = require("twilio");
 
-const client = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
-
 const SEVERITY_EMOJI = {
   low: "🟡",
   medium: "🟠",
   high: "🔴",
 };
 
-/**
- * Sends a WhatsApp alert with CI failure details
- */
 async function sendWhatsAppAlert({ repo, run_id, branch, actor, analysis }) {
+  // ✅ Create client here (not at module load time)
+  // so that Twilio credentials are already loaded from SSM via secrets.js
+  const client = twilio(
+    process.env.TWILIO_ACCOUNT_SID,
+    process.env.TWILIO_AUTH_TOKEN
+  );
+
   const emoji = SEVERITY_EMOJI[analysis.severity] || "🔴";
   const logsUrl = `https://github.com/${repo}/actions/runs/${run_id}`;
 

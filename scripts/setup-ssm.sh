@@ -4,7 +4,7 @@
 # Usage: bash scripts/setup-ssm.sh
 # Make sure you're logged in: aws configure
 
-REGION="us-east-1"   # ← change to your preferred region
+REGION="ap-south-1"
 
 echo "Storing secrets in AWS SSM Parameter Store..."
 

@@ -1,14 +1,7 @@
 // src/githubLogs.js
-// Fetches and extracts CI run logs from GitHub API
-
 const axios = require("axios");
 const AdmZip = require("adm-zip");
 
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-
-/**
- * Downloads the logs ZIP from GitHub and extracts text content
- */
 async function fetchRunLogs(repo, run_id) {
   const url = `https://api.github.com/repos/${repo}/actions/runs/${run_id}/logs`;
 
@@ -16,18 +9,22 @@ async function fetchRunLogs(repo, run_id) {
 
   const response = await axios.get(url, {
     headers: {
-      Authorization: `Bearer ${GITHUB_TOKEN}`,
+      Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
       Accept: "application/vnd.github+json",
     },
-    responseType: "arraybuffer", // logs come as a ZIP file
+    responseType: "arraybuffer",
+    maxRedirects: 5,        // ✅ follow the 302 redirect to the actual ZIP download URL
+    validateStatus: (status) => status < 400,  // treat 3xx as success
   });
 
-  // Unzip the buffer in memory
+  console.log(`📦 Logs response status: ${response.status}`);
+
   const zip = new AdmZip(Buffer.from(response.data));
   const entries = zip.getEntries();
 
-  let allLogs = "";
+  console.log(`📂 ZIP contains ${entries.length} log files`);
 
+  let allLogs = "";
   for (const entry of entries) {
     if (!entry.isDirectory) {
       const content = entry.getData().toString("utf8");
@@ -38,10 +35,6 @@ async function fetchRunLogs(repo, run_id) {
   return allLogs;
 }
 
-/**
- * Filters logs down to error/failure lines only (max 60 lines)
- * to avoid sending thousands of tokens to the LLM
- */
 function extractErrorLines(rawLogs) {
   const errorKeywords = [
     "error",
@@ -63,11 +56,9 @@ function extractErrorLines(rawLogs) {
     return errorKeywords.some((kw) => lower.includes(kw));
   });
 
-  // Deduplicate and limit
   const unique = [...new Set(errorLines)].slice(0, 60);
 
   if (unique.length === 0) {
-    // Fallback: return last 40 lines (something still failed)
     return lines.slice(-40).join("\n");
   }
 

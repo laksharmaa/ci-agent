@@ -3,14 +3,16 @@
 
 const Groq = require("groq-sdk");
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-
 /**
  * Sends error logs to Groq (llama-3) and returns a structured analysis object:
  * { error_type, root_cause, fix, severity }
  */
 async function analyzeLogs(errorLogs, repo, branch) {
   console.log("🤖 Sending logs to Groq for analysis...");
+
+  // ✅ Create client here (not at module load time)
+  // so that GROQ_API_KEY is already loaded from SSM via secrets.js
+  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
   const prompt = `
 You are an expert DevOps engineer analyzing a CI/CD pipeline failure.
@@ -34,9 +36,9 @@ Use this exact format:
 `;
 
   const response = await groq.chat.completions.create({
-    model: "llama-3.3-70b-versatile", // Fast, free tier, great for structured output
+    model: "llama-3.3-70b-versatile",
     messages: [{ role: "user", content: prompt }],
-    temperature: 0.2, // Low temperature = more consistent, structured output
+    temperature: 0.2,
   });
 
   const raw = response.choices[0].message.content.trim();
@@ -48,7 +50,6 @@ Use this exact format:
     return JSON.parse(clean);
   } catch (err) {
     console.error("⚠️ LLM returned non-JSON:", raw);
-    // Graceful fallback if parsing fails
     return {
       error_type: "Unknown",
       root_cause: raw,
