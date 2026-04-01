@@ -35,7 +35,7 @@ app.post("/ci-failure", validateSecret, async (req, res) => {
   console.log(`   Actor:  ${actor}`);
 
   // ✅ Do ALL async work BEFORE sending response
-  // Lambda freezes the process after res.json() — nothing runs after it
+  // Lambda freezes the process after res.json()
   try {
     const rawLogs = await fetchRunLogs(repo, run_id);
     const errorLogs = extractErrorLines(rawLogs);
