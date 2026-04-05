@@ -2,7 +2,7 @@
 const express = require("express");
 const { fetchRunLogs, extractErrorLines } = require("./githubLogs");
 const { analyzeLogs } = require("./analyzer");
-const { sendWhatsAppAlert } = require("./notifier");
+const { sendSlackAlert } = require("./slackNotifier");
 
 const app = express();
 app.use(express.json());
@@ -34,8 +34,6 @@ app.post("/ci-failure", validateSecret, async (req, res) => {
   console.log(`   Run ID: ${run_id}`);
   console.log(`   Actor:  ${actor}`);
 
-  // ✅ Do ALL async work BEFORE sending response
-  // Lambda freezes the process after res.json()
   try {
     const rawLogs = await fetchRunLogs(repo, run_id);
     const errorLogs = extractErrorLines(rawLogs);
@@ -44,10 +42,9 @@ app.post("/ci-failure", validateSecret, async (req, res) => {
     const analysis = await analyzeLogs(errorLogs, repo, branch);
     console.log("📊 Analysis:", analysis);
 
-    await sendWhatsAppAlert({ repo, run_id, branch, actor, analysis });
-    console.log("✅ Pipeline complete");
+    await sendSlackAlert({ repo, run_id, branch, actor, analysis });
 
-    // Send response only after everything is done
+    console.log("✅ Pipeline complete");
     res.json({ status: "done", run_id });
 
   } catch (err) {

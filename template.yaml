@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 
-Description: AI DevOps Agent — CI failure analyzer with WhatsApp alerts
+Description: AI DevOps Agent — CI failure analyzer with Slack alerts
 
 Globals:
   Function:
@@ -21,7 +21,7 @@ Resources:
       FunctionName: ai-devops-agent
       Handler: src/lambda.handler
       CodeUri: .
-      Description: Analyzes GitHub CI failures and sends WhatsApp alerts
+      Description: Analyzes GitHub CI failures and sends Slack alerts
       Policies:
         # Grant Lambda permission to read SSM parameters
         - SSMParameterReadPolicy:

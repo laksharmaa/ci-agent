@@ -15,11 +15,8 @@ async function loadSecrets() {
   const PARAM_NAMES = [
     "/ai-devops-agent/GITHUB_TOKEN",
     "/ai-devops-agent/GROQ_API_KEY",
-    "/ai-devops-agent/TWILIO_ACCOUNT_SID",
-    "/ai-devops-agent/TWILIO_AUTH_TOKEN",
-    "/ai-devops-agent/TWILIO_WHATSAPP_FROM",
-    "/ai-devops-agent/TWILIO_WHATSAPP_TO",
     "/ai-devops-agent/AGENT_SECRET",
+    "/ai-devops-agent/SLACK_WEBHOOK_URL",
   ];
 
   const command = new GetParametersCommand({
