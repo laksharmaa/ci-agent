@@ -56,29 +56,35 @@ const NOISE_PATTERNS = [
   /^RUNNER_/i,
   /^##\[section\]/i,
   /^\/usr\/bin\/git/i,
-  /^\s*✓\s+/,           // passing test lines
-  /^\s*✔\s+/,           // passing test lines alternate
-  /^\s*PASS\s+/,        // passing test files
+  /^\s*✓\s+/,
+  /^\s*✔\s+/,
+  /^\s*PASS\s+/,
   /^Resolving deltas/i,
   /^Receiving objects/i,
   /^remote: Counting/i,
   /^remote: Compressing/i,
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\s+$/,  // empty timestamp lines
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\s+$/,
 ];
 
+// Strip timestamps from lines like "2026-04-06T12:10:05.9660918Z FAIL ./app.test.js"
+function stripTimestamp(line) {
+  return line.replace(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\s+/, "").trim();
+}
+
 function stripNoise(lines) {
-  return lines.filter(line => {
-    const trimmed = line.trim();
-    if (!trimmed) return false;
-    return !NOISE_PATTERNS.some(pattern => pattern.test(trimmed));
-  });
+  return lines
+    .map(stripTimestamp)
+    .filter(line => {
+      if (!line.trim()) return false;
+      return !NOISE_PATTERNS.some(pattern => pattern.test(line.trim()));
+    });
 }
 
 // ─── Stage 2: Detect error category ───────────────────────────────────────────
 function detectCategory(lines) {
   const text = lines.join("\n").toLowerCase();
 
-  if (/fail\s+src\/|fail\s+test\/|●\s+|expected:|received:|toequal|tobetruthy/i.test(text)) {
+  if (/fail\s+src\/|fail\s+test\/|fail\s+\.\/|●\s+|expected:|received:|toequal|tobetruthy/i.test(text)) {
     return "Test Failure";
   }
   if (/syntaxerror|cannot find module|unexpected token|import.*error/i.test(text)) {
@@ -108,7 +114,7 @@ function extractByCategory(lines, category) {
   switch (category) {
     case "Test Failure":
       return lines.filter(line =>
-        /FAIL\s+|●\s+|Expected:|Received:|at\s+\S+\.test\.\w+:\d+|AssertionError|test.*failed/i.test(line)
+        /FAIL\s+|●\s+|Expected:|Received:|at\s+\S+\.test\.\w+:\d+|AssertionError|Tests:|Test Suites:/i.test(line)
       );
 
     case "Build Error":
@@ -132,19 +138,59 @@ function extractByCategory(lines, category) {
       );
 
     default:
-      // fallback — return lines with error keywords
       return lines.filter(line =>
         /error|failed|failure|fatal|exception/i.test(line)
       );
   }
 }
 
-// ─── Stage 4: Smart extract (main export) ─────────────────────────────────────
+// ─── Stage 4: Parse test counts (Jest only) ───────────────────────────────────
+function parseTestCounts(lines) {
+  const text = lines.join("\n");
+
+  // Jest format: "Tests:       1 failed, 2 passed, 3 total"
+  const testsMatch = text.match(/Tests:\s+(.+)/);
+  const suitesMatch = text.match(/Test Suites:\s+(.+)/);
+
+  if (!testsMatch) return null; // not Jest or line not found — skip silently
+
+  const tests = testsMatch[1].trim();
+  const suites = suitesMatch ? suitesMatch[1].trim() : null;
+
+  // Parse numbers from "1 failed, 2 passed, 3 total"
+  const failedMatch = tests.match(/(\d+)\s+failed/);
+  const passedMatch = tests.match(/(\d+)\s+passed/);
+  const totalMatch  = tests.match(/(\d+)\s+total/);
+
+  const failed = failedMatch ? parseInt(failedMatch[1]) : 0;
+  const passed = passedMatch ? parseInt(passedMatch[1]) : 0;
+  const total  = totalMatch  ? parseInt(totalMatch[1])  : 0;
+
+  const failPercent = total > 0 ? Math.round((failed / total) * 100) : 0;
+
+  const result = {
+    summary: tests,                          // "1 failed, 2 passed, 3 total"
+    suites: suites,                          // "1 failed, 1 total"
+    failed,
+    passed,
+    total,
+    fail_percent: `${failPercent}%`,
+  };
+
+  console.log(`🧪 Test counts parsed:`);
+  console.log(`   Tests:  ${tests}`);
+  if (suites) console.log(`   Suites: ${suites}`);
+  console.log(`   Failure rate: ${failPercent}% (${failed}/${total})`);
+
+  return result;
+}
+
+// ─── Main export ──────────────────────────────────────────────────────────────
 function extractErrorLines(rawLogs) {
   const allLines = rawLogs.split("\n");
   console.log(`📊 Total raw log lines: ${allLines.length}`);
 
-  // Stage 1 — strip noise
+  // Stage 1 — strip noise + timestamps
   const cleanLines = stripNoise(allLines);
   console.log(`🧹 After noise removal: ${cleanLines.length} lines`);
 
@@ -156,25 +202,57 @@ function extractErrorLines(rawLogs) {
   let extracted = extractByCategory(cleanLines, category);
   console.log(`✂️  Category-specific extraction: ${extracted.length} lines`);
 
-  // If category extraction got too few lines, fall back to keyword filter
+  // fallback if too few lines
   if (extracted.length < 3) {
-    console.log(`⚠️  Too few lines extracted, falling back to keyword filter`);
+    console.log(`⚠️  Too few lines, falling back to keyword filter`);
     extracted = cleanLines.filter(line =>
       /error|failed|failure|fatal|exception|exit code/i.test(line)
     );
   }
 
-  // Stage 4 — deduplicate and limit to 15 lines
+  // Stage 4 — parse test counts if Test Failure
+  let testCounts = null;
+  if (category === "Test Failure") {
+    testCounts = parseTestCounts(extracted);
+  }
+
+  // deduplicate and limit
   const unique = [...new Set(extracted.map(l => l.trim()))].slice(0, 15);
   console.log(`✅ Final extracted lines: ${unique.length}`);
 
-  // Log the actual extracted lines so we can see what goes to Groq
   console.log("─── Extracted lines sent to Groq ───");
   unique.forEach((line, i) => console.log(`  ${i + 1}. ${line}`));
   console.log("────────────────────────────────────");
 
-  // Prepend category as context for Groq
-  return `[Detected Category: ${category}]\n${unique.join("\n")}`;
+  return {
+    lines: `[Detected Category: ${category}]\n${unique.join("\n")}`,
+    category,
+    testCounts, // null for non-test failures
+  };
+}
+
+// ─── Stage 5: Extract failed file name + line number ──────────────────────────
+function extractFailedFile(lines, category) {
+  for (const line of lines) {
+ 
+    // Jest: "FAIL src/auth/user.test.js" or "FAIL ./app.test.js"
+    const jestMatch = line.match(/^FAIL\s+(\S+\.(test|spec)\.(js|ts|jsx|tsx))/i);
+    if (jestMatch) return jestMatch[1];
+ 
+    // Stack trace: "at Object.<anonymous> (src/app.js:24:5)"
+    const stackMatch = line.match(/\(([^)]+\.(js|ts|jsx|tsx)):(\d+):\d+\)/);
+    if (stackMatch) return `${stackMatch[1]}:${stackMatch[3]}`;
+ 
+    // TypeScript: "src/app.ts:24:5 - error TS2345"
+    const tsMatch = line.match(/^(src\/[^\s:]+\.(ts|tsx)):(\d+):\d+/);
+    if (tsMatch) return `${tsMatch[1]}:${tsMatch[3]}`;
+ 
+    // Require stack: "- /home/runner/work/repo/src/app.js"
+    const requireMatch = line.match(/- .+\/(src\/.+\.(js|ts|jsx|tsx))/);
+    if (requireMatch) return requireMatch[1];
+  }
+ 
+  return null; // not found — skipped gracefully
 }
 
 module.exports = { fetchRunLogs, extractErrorLines };

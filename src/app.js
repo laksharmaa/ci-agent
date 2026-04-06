@@ -22,11 +22,9 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// ─── Stats endpoint ────────────────────────────────────────────────────────────
 app.get("/stats", validateSecret, async (req, res) => {
   const { repo } = req.query;
   if (!repo) return res.status(400).json({ error: "Missing repo query param" });
-
   try {
     const stats = await getStats(repo);
     res.json(stats);
@@ -36,7 +34,6 @@ app.get("/stats", validateSecret, async (req, res) => {
   }
 });
 
-// ─── Main Webhook Handler ──────────────────────────────────────────────────────
 app.post("/ci-failure", validateSecret, async (req, res) => {
   const { repo, commit, run_id, branch, actor } = req.body;
 
@@ -52,24 +49,30 @@ app.post("/ci-failure", validateSecret, async (req, res) => {
 
   try {
     const rawLogs = await fetchRunLogs(repo, run_id);
-    const errorLogs = extractErrorLines(rawLogs);
+
+    // extractErrorLines now returns { lines, category, testCounts, failedFile }
+    const { lines: errorLogs, category, testCounts, failedFile } = extractErrorLines(rawLogs);
     console.log(`📋 Extracted ${errorLogs.split("\n").length} error lines`);
 
     const analysis = await analyzeLogs(errorLogs, repo, branch);
+
+    // Attach test counts to analysis if available
+    if (testCounts) analysis.testCounts = testCounts;
+
+    // Attach failed file to analysis if detected
+    if (failedFile) analysis.failedFile = failedFile;
+
     console.log("📊 Analysis:", analysis);
 
-    // Check if this error is recurring before saving
+    // Check recurring failures
     const recent = await getRecentFailures(repo, analysis.error_type, 7);
     if (recent.count > 0) {
       analysis.recurring = true;
-      analysis.occurrences = recent.count + 1; // +1 for current failure
-      console.log(`🔁 Recurring failure detected: ${recent.count} times in last 7 days`);
+      analysis.occurrences = recent.count + 1;
+      console.log(`🔁 Recurring failure: ${recent.count} times in last 7 days`);
     }
 
-    // Save to DynamoDB
     await saveFailure({ repo, branch, actor, run_id, analysis });
-
-    // Send Slack alert (with recurring info if applicable)
     await sendSlackAlert({ repo, run_id, branch, actor, analysis });
 
     console.log("✅ Pipeline complete");

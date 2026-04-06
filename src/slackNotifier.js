@@ -9,7 +9,6 @@ const SEVERITY_COLOR = {
 
 async function sendSlackAlert({ repo, run_id, branch, actor, analysis }) {
   const webhookUrl = process.env.SLACK_WEBHOOK_URL;
-
   if (!webhookUrl) {
     console.warn("⚠️ SLACK_WEBHOOK_URL not set, skipping Slack alert");
     return;
@@ -18,10 +17,24 @@ async function sendSlackAlert({ repo, run_id, branch, actor, analysis }) {
   const logsUrl = `https://github.com/${repo}/actions/runs/${run_id}`;
   const color = SEVERITY_COLOR[analysis.severity] || "#FF0000";
 
-  // Add recurring warning if detected
-  const recurringText = analysis.recurring
-    ? `⚠️ *Recurring issue — seen ${analysis.occurrences} times in last 7 days*\n`
-    : "";
+  // Build test counts block if available
+  const testCountsBlock = analysis.testCounts ? {
+    type: "section",
+    fields: [
+      {
+        type: "mrkdwn",
+        text: `*Tests Failed:*\n${analysis.testCounts.failed}/${analysis.testCounts.total} (${analysis.testCounts.fail_percent})`,
+      },
+      {
+        type: "mrkdwn",
+        text: `*Tests Passed:*\n${analysis.testCounts.passed}/${analysis.testCounts.total}`,
+      },
+      ...(analysis.testCounts.suites ? [{
+        type: "mrkdwn",
+        text: `*Test Suites:*\n${analysis.testCounts.suites}`,
+      }] : []),
+    ],
+  } : null;
 
   const payload = {
     text: `🚨 CI Pipeline Failed — ${repo}`,
@@ -31,12 +44,10 @@ async function sendSlackAlert({ repo, run_id, branch, actor, analysis }) {
         blocks: [
           {
             type: "header",
-            text: {
-              type: "plain_text",
-              text: "🚨 CI Pipeline Failed",
-            },
+            text: { type: "plain_text", text: "🚨 CI Pipeline Failed" },
           },
-          // Show recurring warning block only if recurring
+
+          // Recurring warning block
           ...(analysis.recurring ? [{
             type: "section",
             text: {
@@ -44,6 +55,8 @@ async function sendSlackAlert({ repo, run_id, branch, actor, analysis }) {
               text: `⚠️ *Recurring issue — seen ${analysis.occurrences} times in last 7 days*`,
             },
           }] : []),
+
+          // Repo, branch, actor, severity
           {
             type: "section",
             fields: [
@@ -51,8 +64,14 @@ async function sendSlackAlert({ repo, run_id, branch, actor, analysis }) {
               { type: "mrkdwn", text: `*Branch:*\n${branch}` },
               { type: "mrkdwn", text: `*Triggered by:*\n${actor}` },
               { type: "mrkdwn", text: `*Severity:*\n${analysis.severity.toUpperCase()}` },
+              ...(analysis.failedFile ? [{ type: "mrkdwn", text: `*Failed File:*\n\`${analysis.failedFile}\`` }] : []),
             ],
           },
+
+          // Test counts block (only for Test Failure)
+          ...(testCountsBlock ? [testCountsBlock] : []),
+
+          // Error details
           {
             type: "section",
             text: {
@@ -60,6 +79,8 @@ async function sendSlackAlert({ repo, run_id, branch, actor, analysis }) {
               text: `*Error Type:* ${analysis.error_type}\n*Root Cause:* ${analysis.root_cause}`,
             },
           },
+
+          // Suggested fix
           {
             type: "section",
             text: {
@@ -67,6 +88,8 @@ async function sendSlackAlert({ repo, run_id, branch, actor, analysis }) {
               text: `*Suggested Fix:*\n${analysis.fix}`,
             },
           },
+
+          // View logs button
           {
             type: "actions",
             elements: [
