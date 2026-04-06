@@ -1,57 +1,46 @@
 // src/analyzer.js
-// Sends filtered logs to Groq and gets structured analysis
-
 const Groq = require("groq-sdk");
 
-/**
- * Sends error logs to Groq (llama-3) and returns a structured analysis object:
- * { error_type, root_cause, fix, severity }
- */
 async function analyzeLogs(errorLogs, repo, branch) {
   console.log("🤖 Sending logs to Groq for analysis...");
+  console.log(`📏 Token estimate: ~${Math.ceil(errorLogs.length / 4)} tokens`);
 
-  // ✅ Create client here (not at module load time)
-  // so that GROQ_API_KEY is already loaded from SSM via secrets.js
   const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-  const prompt = `
-You are an expert DevOps engineer analyzing a CI/CD pipeline failure.
+  const prompt = `You are a DevOps engineer. Analyze this CI failure and return JSON only.
 
-Repository: ${repo}
-Branch: ${branch}
+Repo: ${repo} | Branch: ${branch}
 
-Here are the error logs from the failed CI run:
-\`\`\`
+Logs:
 ${errorLogs}
-\`\`\`
 
-Analyze the failure and respond ONLY with a valid JSON object. No extra text.
-Use this exact format:
+Return ONLY this JSON, no extra text:
 {
-  "error_type": "short category like 'Test Failure', 'Build Error', 'Dependency Issue', 'Lint Error', 'Network Error'",
-  "root_cause": "one clear sentence explaining the root cause",
-  "fix": "one or two concrete steps the developer should take to fix it",
+  "error_type": "one of: Test Failure, Build Error, TypeScript Error, Dependency/Script Error, Network Error, Permission Error, Docker Error, General Error",
+  "root_cause": "one sentence, specific to the actual error shown",
+  "fix": "1-2 concrete actionable steps",
   "severity": "low | medium | high"
-}
-`;
+}`;
 
+  // llama-3.1-8b-instant — fast, cheap, great for structured log analysis
+  // 8b model is perfect here: logs are factual, no complex reasoning needed
   const response = await groq.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
+    model: "llama-3.1-8b-instant",
     messages: [{ role: "user", content: prompt }],
-    temperature: 0.2,
+    temperature: 0.1,         // very low — we want consistent structured output
+    max_tokens: 200,          // JSON response never needs more than 200 tokens
+    response_format: { type: "json_object" }, // force JSON output — no parsing issues
   });
 
   const raw = response.choices[0].message.content.trim();
-
-  // Strip any accidental markdown fences
-  const clean = raw.replace(/```json|```/g, "").trim();
+  console.log(`💰 Tokens used — prompt: ${response.usage.prompt_tokens}, completion: ${response.usage.completion_tokens}`);
 
   try {
-    return JSON.parse(clean);
+    return JSON.parse(raw);
   } catch (err) {
-    console.error("⚠️ LLM returned non-JSON:", raw);
+    console.error("⚠️ Failed to parse LLM response:", raw);
     return {
-      error_type: "Unknown",
+      error_type: "General Error",
       root_cause: raw,
       fix: "Check the logs manually.",
       severity: "medium",

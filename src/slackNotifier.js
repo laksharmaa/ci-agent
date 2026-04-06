@@ -1,12 +1,10 @@
 // src/slackNotifier.js
-// Sends a Slack alert using an Incoming Webhook — no SDK needed, just axios
-
 const axios = require("axios");
 
 const SEVERITY_COLOR = {
-  low: "#FFD700",     // yellow
-  medium: "#FF8C00",  // orange
-  high: "#FF0000",    // red
+  low: "#FFD700",
+  medium: "#FF8C00",
+  high: "#FF0000",
 };
 
 async function sendSlackAlert({ repo, run_id, branch, actor, analysis }) {
@@ -20,9 +18,13 @@ async function sendSlackAlert({ repo, run_id, branch, actor, analysis }) {
   const logsUrl = `https://github.com/${repo}/actions/runs/${run_id}`;
   const color = SEVERITY_COLOR[analysis.severity] || "#FF0000";
 
-  // Slack Block Kit message — looks clean and professional
+  // Add recurring warning if detected
+  const recurringText = analysis.recurring
+    ? `⚠️ *Recurring issue — seen ${analysis.occurrences} times in last 7 days*\n`
+    : "";
+
   const payload = {
-    text: `🚨 CI Pipeline Failed — ${repo}`,   // notification preview text
+    text: `🚨 CI Pipeline Failed — ${repo}`,
     attachments: [
       {
         color,
@@ -31,9 +33,17 @@ async function sendSlackAlert({ repo, run_id, branch, actor, analysis }) {
             type: "header",
             text: {
               type: "plain_text",
-              text: `🚨 CI Pipeline Failed`,
+              text: "🚨 CI Pipeline Failed",
             },
           },
+          // Show recurring warning block only if recurring
+          ...(analysis.recurring ? [{
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `⚠️ *Recurring issue — seen ${analysis.occurrences} times in last 7 days*`,
+            },
+          }] : []),
           {
             type: "section",
             fields: [
@@ -74,9 +84,7 @@ async function sendSlackAlert({ repo, run_id, branch, actor, analysis }) {
   };
 
   console.log("💬 Sending Slack alert...");
-
   await axios.post(webhookUrl, payload);
-
   console.log("✅ Slack alert sent!");
 }
 

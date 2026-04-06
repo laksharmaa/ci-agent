@@ -6,7 +6,7 @@ require("dotenv").config();
 const express = require("express");
 const { fetchRunLogs, extractErrorLines } = require("./githubLogs");
 const { analyzeLogs } = require("./analyzer");
-const { sendWhatsAppAlert } = require("./notifier");
+const { sendSlackAlert } = require("./slackNotifier");
 
 const app = express();
 app.use(express.json());
@@ -61,8 +61,8 @@ app.post("/ci-failure", validateSecret, async (req, res) => {
     const analysis = await analyzeLogs(errorLogs, repo, branch);
     console.log("📊 Analysis:", analysis);
 
-    // Step 4: Send WhatsApp notification
-    await sendWhatsAppAlert({ repo, run_id, branch, actor, analysis });
+    // Step 4: Send Slack alert with analysis results
+    await sendSlackAlert({ repo, run_id, branch, actor, analysis });
 
   } catch (err) {
     console.error("❌ Pipeline processing error:", err.message);
