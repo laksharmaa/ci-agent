@@ -1,12 +1,9 @@
-// src/index.js
-// Main Express server — receives CI failure webhooks from GitHub Actions
-
 require("dotenv").config();
 
 const express = require("express");
-const { fetchRunLogs, extractErrorLines } = require("./githubLogs");
-const { analyzeLogs } = require("./analyzer");
-const { sendSlackAlert } = require("./slackNotifier");
+const { fetchRunLogs, extractErrorLines } = require("./services/githubLogs");
+const { analyzeLogs } = require("./services/analyzer");
+const { sendSlackAlert } = require("./integrations/slackNotifier");
 
 const app = express();
 app.use(express.json());

@@ -1,6 +1,6 @@
 const axios = require("axios");
 const AdmZip = require("adm-zip");
-const retry = require("./utils/retry");
+const retry = require("../utils/retry");
 
 async function fetchRunLogs(repo, run_id) {
   const url = `https://api.github.com/repos/${repo}/actions/runs/${run_id}/logs`;

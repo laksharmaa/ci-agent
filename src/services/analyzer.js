@@ -1,5 +1,5 @@
 const Groq = require("groq-sdk");
-const retry = require("./utils/retry");
+const retry = require("../utils/retry");
 
 async function analyzeLogs(errorLogs, repo, branch) {
   console.log("🤖 Sending logs to Groq for analysis...");

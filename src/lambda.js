@@ -1,6 +1,6 @@
 // src/lambda.js
 const serverless = require("serverless-http");
-const { loadSecrets } = require("./secrets");
+const { loadSecrets } = require("./config/secrets");
 const app = require("./app");
 
 const serverlessApp = serverless(app);

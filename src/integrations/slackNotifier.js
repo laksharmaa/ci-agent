@@ -1,5 +1,5 @@
 const axios = require("axios");
-const retry = require("./utils/retry");
+const retry = require("../utils/retry");
 
 const SEVERITY_COLOR = {
   low: "#FFD700",

@@ -1,9 +1,9 @@
 // src/app.js
 const express = require("express");
-const { fetchRunLogs, extractErrorLines } = require("./githubLogs");
-const { analyzeLogs } = require("./analyzer");
-const { sendSlackAlert } = require("./slackNotifier");
-const { saveFailure, getRecentFailures, getStats } = require("./database");
+const { fetchRunLogs, extractErrorLines } = require("./services/githubLogs");
+const { analyzeLogs } = require("./services/analyzer");
+const { sendSlackAlert } = require("./integrations/slackNotifier");
+const { saveFailure, getRecentFailures, getStats } = require("./db/database");
 
 const app = express();
 app.use(express.json());

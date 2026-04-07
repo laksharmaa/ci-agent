@@ -1,12 +1,4 @@
-// src/database.js
-// Handles all DynamoDB operations for storing and querying CI failures
-
-const {
-  DynamoDBClient,
-  PutItemCommand,
-  QueryCommand,
-  ScanCommand,
-} = require("@aws-sdk/client-dynamodb");
+const { DynamoDBClient, PutItemCommand, QueryCommand} = require("@aws-sdk/client-dynamodb");
 const { marshall, unmarshall } = require("@aws-sdk/util-dynamodb");
 const { v4: uuidv4 } = require("uuid");
 
