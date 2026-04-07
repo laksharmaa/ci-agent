@@ -1,5 +1,5 @@
-// src/analyzer.js
 const Groq = require("groq-sdk");
+const retry = require("./utils/retry");
 
 async function analyzeLogs(errorLogs, repo, branch) {
   console.log("🤖 Sending logs to Groq for analysis...");
@@ -22,15 +22,16 @@ Return ONLY this JSON, no extra text:
   "severity": "low | medium | high"
 }`;
 
-  // llama-3.1-8b-instant — fast, cheap, great for structured log analysis
-  // 8b model is perfect here: logs are factual, no complex reasoning needed
-  const response = await groq.chat.completions.create({
-    model: "llama-3.1-8b-instant",
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0.1,         // very low — we want consistent structured output
-    max_tokens: 200,          // JSON response never needs more than 200 tokens
-    response_format: { type: "json_object" }, // force JSON output — no parsing issues
-  });
+  // 🔁 RETRY WRAPPER ADDED HERE
+  const response = await retry(() => 
+    groq.chat.completions.create({
+      model: "llama-3.1-8b-instant",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.1,
+      max_tokens: 200,
+      response_format: { type: "json_object" },
+    })
+  );
 
   const raw = response.choices[0].message.content.trim();
   console.log(`💰 Tokens used — prompt: ${response.usage.prompt_tokens}, completion: ${response.usage.completion_tokens}`);

@@ -1,9 +1,6 @@
-#!/bin/bash
-# scripts/deploy.sh
-# Builds and deploys the Lambda function using AWS SAM
 # Usage: bash scripts/deploy.sh
 
-set -e  # exit on any error
+set -e
 
 STACK_NAME="ai-devops-agent"
 REGION="ap-south-1"        # ← match the region you used in setup-ssm.sh

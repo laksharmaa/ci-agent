@@ -1,6 +1,6 @@
-// src/githubLogs.js
 const axios = require("axios");
 const AdmZip = require("adm-zip");
+const retry = require("./utils/retry");
 
 async function fetchRunLogs(repo, run_id) {
   const url = `https://api.github.com/repos/${repo}/actions/runs/${run_id}/logs`;
@@ -8,7 +8,7 @@ async function fetchRunLogs(repo, run_id) {
   console.log(`📥 Fetching logs for run ${run_id} from ${repo}...`);
 
   try {
-    const response = await axios.get(url, {
+    const response = await retry(() => axios.get(url, {
       headers: {
         Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
         Accept: "application/vnd.github+json",
@@ -16,7 +16,7 @@ async function fetchRunLogs(repo, run_id) {
       responseType: "arraybuffer",
       maxRedirects: 5,
       validateStatus: (status) => status < 400,
-    });
+    }));
 
     console.log(`📦 Logs response status: ${response.status}`);
 
@@ -160,11 +160,11 @@ function parseTestCounts(lines) {
   // Parse numbers from "1 failed, 2 passed, 3 total"
   const failedMatch = tests.match(/(\d+)\s+failed/);
   const passedMatch = tests.match(/(\d+)\s+passed/);
-  const totalMatch  = tests.match(/(\d+)\s+total/);
+  const totalMatch = tests.match(/(\d+)\s+total/);
 
   const failed = failedMatch ? parseInt(failedMatch[1]) : 0;
   const passed = passedMatch ? parseInt(passedMatch[1]) : 0;
-  const total  = totalMatch  ? parseInt(totalMatch[1])  : 0;
+  const total = totalMatch ? parseInt(totalMatch[1]) : 0;
 
   const failPercent = total > 0 ? Math.round((failed / total) * 100) : 0;
 
@@ -234,24 +234,24 @@ function extractErrorLines(rawLogs) {
 // ─── Stage 5: Extract failed file name + line number ──────────────────────────
 function extractFailedFile(lines, category) {
   for (const line of lines) {
- 
+
     // Jest: "FAIL src/auth/user.test.js" or "FAIL ./app.test.js"
     const jestMatch = line.match(/^FAIL\s+(\S+\.(test|spec)\.(js|ts|jsx|tsx))/i);
     if (jestMatch) return jestMatch[1];
- 
+
     // Stack trace: "at Object.<anonymous> (src/app.js:24:5)"
     const stackMatch = line.match(/\(([^)]+\.(js|ts|jsx|tsx)):(\d+):\d+\)/);
     if (stackMatch) return `${stackMatch[1]}:${stackMatch[3]}`;
- 
+
     // TypeScript: "src/app.ts:24:5 - error TS2345"
     const tsMatch = line.match(/^(src\/[^\s:]+\.(ts|tsx)):(\d+):\d+/);
     if (tsMatch) return `${tsMatch[1]}:${tsMatch[3]}`;
- 
+
     // Require stack: "- /home/runner/work/repo/src/app.js"
     const requireMatch = line.match(/- .+\/(src\/.+\.(js|ts|jsx|tsx))/);
     if (requireMatch) return requireMatch[1];
   }
- 
+
   return null; // not found — skipped gracefully
 }
 

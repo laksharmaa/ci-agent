@@ -1,5 +1,5 @@
-// src/slackNotifier.js
 const axios = require("axios");
+const retry = require("./utils/retry");
 
 const SEVERITY_COLOR = {
   low: "#FFD700",
@@ -107,8 +107,13 @@ async function sendSlackAlert({ repo, run_id, branch, actor, analysis }) {
   };
 
   console.log("💬 Sending Slack alert...");
-  await axios.post(webhookUrl, payload);
-  console.log("✅ Slack alert sent!");
+
+  try {
+    await retry(() => axios.post(webhookUrl, payload));
+    console.log("✅ Slack alert sent!");
+  } catch (err) {
+    console.error("❌ Failed to send Slack alert:", err.message);
+  }
 }
 
 module.exports = { sendSlackAlert };
