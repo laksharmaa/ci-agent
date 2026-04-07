@@ -3,20 +3,19 @@
 set -e
 
 STACK_NAME="ai-devops-agent"
-REGION="ap-south-1"        # ← match the region you used in setup-ssm.sh
-S3_BUCKET="ai-devops-agent-deploy-$(whoami)-$(date +%s)"   # unique S3 bucket for deployment artifacts
+REGION="ap-south-1"
+S3_BUCKET="ai-devops-agent-deploy-$(whoami)"   # ✅ fixed name, no timestamp
 
-echo "📦 Installing dependencies..."
-npm install --production
+echo "📦 Installing production dependencies..."
+npm install --production   # intentional — excludes jest/supertest from Lambda bundle
 
 echo ""
-echo "🪣 Creating S3 bucket for deployment (if not exists)..."
-echo "Creating bucket: $S3_BUCKET"
-
-aws s3 mb s3://$S3_BUCKET --region $REGION || {
-  echo "❌ Failed to create bucket. Exiting..."
-  exit 1
-}
+echo "🪣 Checking S3 bucket..."
+# aws s3api head-bucket --bucket $S3_BUCKET 2>/dev/null && \
+AWS_PAGER="" aws s3api head-bucket --bucket $S3_BUCKET 2>/dev/null
+  echo "✅ Bucket already exists, reusing: $S3_BUCKET" || \
+  aws s3 mb s3://$S3_BUCKET --region $REGION && \
+  echo "✅ Created new bucket: $S3_BUCKET"
 
 echo ""
 echo "🔨 Building SAM application..."
