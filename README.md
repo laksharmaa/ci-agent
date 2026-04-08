@@ -20,6 +20,19 @@ Deployed as an AWS Lambda function via AWS SAM. Zero infrastructure to manage.
 
 ---
 
+## 🏗️ Architecture
+
+**High-level flow:**
+
+![alt text](architecturalDiagram.png)
+
+```
+Developer → Git Push → CI Pipeline → Failure → Webhook → API Gateway
+→ Lambda → S3 (logs) → AI Model → Slack Notification
+```
+
+---
+
 ## How It Works
 
 ```
