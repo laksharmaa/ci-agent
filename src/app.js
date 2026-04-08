@@ -35,7 +35,7 @@ app.get("/stats", validateSecret, async (req, res) => {
 });
 
 app.post("/ci-failure", validateSecret, async (req, res) => {
-  const { repo, commit, run_id, branch, actor } = req.body;
+  const { repo, run_id, branch, actor } = req.body;
 
   if (!repo || !run_id) {
     return res.status(400).json({ error: "Missing repo or run_id" });

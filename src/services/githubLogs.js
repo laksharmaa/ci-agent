@@ -218,7 +218,7 @@ function extractErrorLines(rawLogs) {
 
   // deduplicate and limit
   const unique = [...new Set(extracted.map(l => l.trim()))].slice(0, 15);
-  console.log(`✅ Final extracted lines: ${unique.length}`);
+  console.log(`Final extracted lines: ${unique.length}`);
 
   console.log("─── Extracted lines sent to Groq ───");
   unique.forEach((line, i) => console.log(`  ${i + 1}. ${line}`));
