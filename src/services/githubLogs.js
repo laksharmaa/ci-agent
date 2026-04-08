@@ -224,10 +224,13 @@ function extractErrorLines(rawLogs) {
   unique.forEach((line, i) => console.log(`  ${i + 1}. ${line}`));
   console.log("────────────────────────────────────");
 
+  const failedFile = extractFailedFile(cleanLines, category);
+
   return {
     lines: `[Detected Category: ${category}]\n${unique.join("\n")}`,
     category,
-    testCounts, // null for non-test failures
+    testCounts,
+    failedFile,
   };
 }
 
